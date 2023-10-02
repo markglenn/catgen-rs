@@ -1,7 +1,7 @@
 CatGen-rs
 =========
 
-[![Screenshot](https://github.com/markglenn/catgen-rs/raw/main/media/screenshot.png)](#features)
+![Screenshot](https://github.com/markglenn/catgen-rs/raw/main/media/screenshot.png)
 
 CatGen-rs is a recreation of the first app I ever sold, called
 [CatGen](https://github.com/markglenn/catgen).

@@ -353,7 +353,7 @@ const DATA: &str = r#"08                        ___ ___ ___________ ___ ___
 01     --------------------------------------
 03     Well, you first run the program.  You see the file and information at the
 03  bottom.  You use the arrow keys or the PGUP or PGDN key.  These move the DOC
-03  up or down.  The new feature is the ÿSÿ feature.  It searches the file for
+03  up or down.  The new feature is the "S" feature.  It searches the file for
 03  whatever you want.
 03
 04 10~02) ~0FFinal Touches
@@ -399,10 +399,10 @@ const DATA: &str = r#"08                        ___ ___ ___________ ___ ___
 04     8) I don't have a mouse and start-up is sooo slow.
 02        You can easily turn off the mouse.  Look for the lines that say
 02        >>>>>> START HERE <<<<<<
-04     9) I edit the basic file and it doesn't have any ÿ's in the DOC.  How
+04     9) I edit the basic file and it doesn't have any "'s in the DOC.  How
 04        do I add them?
-02       A:Well, since DATA statements are surrounded by ÿ's, all ÿ's in your
-02         DOC were converted to character 255's.  To add ÿ's, go to the
+02       A:Well, since DATA statements are surrounded by "'s, all "'s in your
+02         DOC were converted to character 255's.  To add "'s, go to the
 02         position where you want them and hold down ALT.  Then press 255 on the
 02         key pad and let go of ALT.  It is an invisible character, but it is
 02         there.
