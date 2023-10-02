@@ -1,79 +1,55 @@
 mod ansi;
 mod parser;
+mod state;
 mod ui;
 
 use anyhow::Result;
 use parser::PrintableLine;
+use state::State;
 use std::io::{stdout, Stdout, Write};
-use ui::draw_footer;
+use ui::{draw_footer, draw_scollbar};
 
 use crossterm::{
-    cursor::MoveTo,
-    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind},
+    cursor::{self, MoveTo},
+    event::{
+        DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        MouseButton, MouseEvent, MouseEventKind,
+    },
     style::Print,
-    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand, QueueableCommand,
 };
 
-type PrintableLines = Vec<PrintableLine>;
-
 fn main() -> Result<()> {
+    let mut state = State::new(terminal::size()?, DATA.lines().count());
+
     stdout()
         .execute(EnterAlternateScreen)?
         .execute(EnableMouseCapture)?;
 
-    // Get the size of the terminal
-    let (width, height) = crossterm::terminal::size()?;
+    terminal::enable_raw_mode()?;
 
-    crossterm::terminal::enable_raw_mode()?;
-
-    let lines = parser::compile_lines(DATA, width);
+    let lines = parser::compile_lines(DATA, state.width - 1);
 
     let mut stdout = stdout();
 
-    stdout.execute(crossterm::cursor::Hide)?;
+    stdout.execute(cursor::Hide)?;
 
-    let mut current_line = 0;
-    draw_footer(&stdout, width, height)?;
-
-    let drawing_height = height as usize - 2;
-
-    loop {
-        // Loop through all the lines that fit on the screen
-        draw_doc(&stdout, &lines, current_line, drawing_height)?;
-
-        match crossterm::event::read()? {
-            Event::Key(KeyEvent {
-                code: KeyCode::Esc,
-                kind: KeyEventKind::Press,
-                state: _,
-                modifiers: _,
-            }) => break,
-            Event::Key(KeyEvent {
-                code: KeyCode::Up,
-                kind: KeyEventKind::Press,
-                state: _,
-                modifiers: _,
-            }) => {
-                if current_line > 0 {
-                    current_line -= 1;
-                }
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Down,
-                kind: KeyEventKind::Press,
-                state: _,
-                modifiers: _,
-            }) => {
-                current_line = std::cmp::min(current_line + 1, lines.len() - drawing_height);
-            }
-            r => println!("{:?}", r),
+    while state.running {
+        if state.is_dirty {
+            // Loop through all the lines that fit on the screen
+            draw_doc(&stdout, &lines, &state)?;
+            draw_scollbar(&stdout, &state)?;
+            draw_footer(&stdout, &state)?;
         }
+
+        handle_events(&mut state, &lines)?;
     }
 
-    crossterm::terminal::disable_raw_mode()?;
+    terminal::disable_raw_mode()?;
+
     stdout
-        .execute(crossterm::cursor::Show)?
+        .execute(cursor::Show)?
         .execute(LeaveAlternateScreen)?
         .execute(DisableMouseCapture)?;
 
@@ -82,14 +58,107 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn handle_events(state: &mut State, lines: &Vec<PrintableLine>) -> Result<()> {
+    let previous_line = state.current_line;
+    let mut is_dirty = false;
+
+    match crossterm::event::read()? {
+        Event::Key(KeyEvent {
+            code: KeyCode::Esc,
+            kind: KeyEventKind::Press,
+            state: _,
+            modifiers: _,
+        }) => state.running = false,
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Up,
+            kind: KeyEventKind::Press,
+            ..
+        })
+        | Event::Mouse(MouseEvent {
+            kind: MouseEventKind::ScrollUp,
+            ..
+        }) => state.scroll_up(1),
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Down,
+            kind: KeyEventKind::Press,
+            ..
+        })
+        | Event::Mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            ..
+        }) => state.scroll_down(1),
+
+        Event::Key(KeyEvent {
+            code: KeyCode::PageDown,
+            kind: KeyEventKind::Press,
+            ..
+        }) => state.scroll_down(state.drawing_height()),
+
+        Event::Key(KeyEvent {
+            code: KeyCode::Home,
+            kind: KeyEventKind::Press,
+            ..
+        }) => state.current_line = 0,
+
+        Event::Key(KeyEvent {
+            code: KeyCode::End,
+            kind: KeyEventKind::Press,
+            ..
+        }) => state.scroll_down(state.document_length),
+
+        Event::Key(KeyEvent {
+            code: KeyCode::PageUp,
+            kind: KeyEventKind::Press,
+            ..
+        }) => state.scroll_up(state.drawing_height()),
+
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            row,
+            column,
+            ..
+        }) => {
+            if column < state.width - 1 {
+                // Find the document line that was clicked
+                let line = row as usize + state.current_line;
+
+                if let Some(PrintableLine::Button(pos, _)) = lines.get(line) {
+                    state.scroll_to(*pos);
+                }
+            } else {
+                // If the click was above the scrollbar position, scroll up
+                if row < state.scrollbar_position() {
+                    state.scroll_up(state.drawing_height());
+                } else {
+                    state.scroll_down(state.drawing_height());
+                }
+            }
+        }
+        Event::Resize(width, height) => {
+            state.resize(width, height);
+            is_dirty = true;
+        }
+
+        // r => panic!("{:?}", r),
+        // r => println!("{:?}", r),
+        _ => {}
+    };
+
+    // Only redraw if the contents need to change
+    state.is_dirty = is_dirty || state.current_line != previous_line;
+
+    Ok(())
+}
+
 fn draw_doc(
     mut stdout: &Stdout,
-    lines: &PrintableLines,
-    line: usize,
-    drawing_height: usize,
+    lines: &Vec<PrintableLine>,
+    state: &State,
 ) -> Result<(), anyhow::Error> {
-    for y in 0..drawing_height {
-        if line + y as usize >= lines.len() {
+    for y in 0..state.drawing_height() {
+        if state.current_line + y as usize >= lines.len() {
             break;
         }
 
@@ -97,7 +166,7 @@ fn draw_doc(
         stdout.queue(MoveTo(0, y as u16))?;
 
         // Print the line
-        print_line(stdout, &lines[line + y as usize])?;
+        print_line(stdout, &lines[state.current_line + y as usize])?;
     }
 
     stdout.flush()?;
@@ -118,8 +187,7 @@ fn print_line(mut stdout: &Stdout, line: &PrintableLine) -> Result<()> {
 }
 
 // Original contents
-const DATA: &str = r#"
-08                        ___ ___ ___________ ___ ___
+const DATA: &str = r#"08                        ___ ___ ___________ ___ ___
 08                       Y   Y   Y   _   _   Y   Y   |
 08                       |   l   l___|   |___|   l   |
 08                       l____   |   |   |   |   _   |

@@ -7,22 +7,23 @@ use crossterm::{
 };
 use std::io::{Stdout, Write};
 
-use crate::parser::generate_line;
+use crate::{parser::generate_line, state::State};
 
-pub fn draw_footer(mut stdout: &Stdout, width: u16, height: u16) -> Result<()> {
+pub fn draw_footer(mut stdout: &Stdout, state: &State) -> Result<()> {
     stdout
-        .queue(MoveTo(0, height - 2))?
+        .queue(MoveTo(0, state.height - 2))?
         .queue(Clear(ClearType::UntilNewLine))?
-        .queue(Print(generate_line(width, 0)?))?;
+        .queue(Print(generate_line(state.width, 0)?))?;
 
     stdout
-        .queue(MoveTo(0, height - 1))?
+        .queue(MoveTo(0, state.height - 1))?
+        .queue(Clear(ClearType::UntilNewLine))?
         .queue(SetColors(Colors::new(Color::Green, Color::Black)))?
         .queue(Print("Catgen v3.0"))?;
 
     // Draw company logo in the center
     stdout
-        .queue(MoveToColumn((width - 22) / 2))?
+        .queue(MoveToColumn((state.width - 22) / 2))?
         .queue(SetForegroundColor(Color::DarkGrey))?
         .queue(Print("4"))?
         .queue(SetForegroundColor(Color::Grey))?
@@ -36,7 +37,7 @@ pub fn draw_footer(mut stdout: &Stdout, width: u16, height: u16) -> Result<()> {
 
     // Draw the helper text
     stdout
-        .queue(MoveToColumn(width - 21))?
+        .queue(MoveToColumn(state.width - 21))?
         .queue(SetForegroundColor(Color::Red))?
         .queue(Print("("))?
         .queue(SetForegroundColor(Color::Green))?
@@ -59,6 +60,31 @@ pub fn draw_footer(mut stdout: &Stdout, width: u16, height: u16) -> Result<()> {
         .queue(Print("rint"))?;
 
     stdout.flush()?;
+    Ok(())
+}
+
+pub fn draw_scollbar(mut stdout: &Stdout, state: &State) -> Result<()> {
+    stdout
+        .queue(SetBackgroundColor(Color::White))?
+        .queue(SetForegroundColor(Color::Black))?
+        .queue(MoveTo(state.width - 1, 0))?
+        .queue(Print("↑"))?
+        .queue(MoveTo(state.width - 1, state.height - 3))?
+        .queue(Print("↓"))?;
+
+    for y in 1..state.height - 3 {
+        stdout
+            .queue(MoveTo(state.width - 1, y))?
+            .queue(Print("░"))?;
+    }
+
+    // Draw the scrollbar position
+    stdout
+        .queue(SetBackgroundColor(Color::Black))?
+        .queue(SetForegroundColor(Color::White))?
+        .queue(MoveTo(state.width - 1, state.scrollbar_position()))?
+        .queue(Print(" "))?
+        .flush()?;
     Ok(())
 }
 
