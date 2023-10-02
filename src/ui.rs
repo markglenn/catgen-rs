@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::{
     cursor::{MoveTo, MoveToColumn},
-    style::{Color, Colors, Print, SetColors, SetForegroundColor},
+    style::{Color, Colors, Print, SetBackgroundColor, SetColors, SetForegroundColor},
     terminal::{Clear, ClearType},
     QueueableCommand,
 };
@@ -59,5 +59,100 @@ pub fn draw_footer(mut stdout: &Stdout, width: u16, height: u16) -> Result<()> {
         .queue(Print("rint"))?;
 
     stdout.flush()?;
+    Ok(())
+}
+
+pub fn draw_closing_screen(mut stdout: &Stdout) -> Result<()> {
+    stdout
+        .queue(Clear(ClearType::All))?
+        .queue(MoveTo(0, 0))?
+        .queue(SetBackgroundColor(Color::Black))?;
+
+    let lines = [
+        (8, r#"                        ___ ___ ___________ ___ ___"#),
+        (8, r#"                       Y   Y   Y   _   _   Y   Y   |"#),
+        (8, r#"                       |   l   l___|   |___|   l   |"#),
+        (8, r#"                       l____   |   |   |   |   _   |"#),
+        (7, r#"                           |   |   |   |   |   |   |"#),
+        (7, r#"                           l___|   |   l   l___|   |"#),
+        (7, r#"                                   `---'       `---'"#),
+        (
+            7,
+            r#"      ______   ___ ___ ___ _______ ______  _______ ___ _______ ______"#,
+        ),
+        (
+            7,
+            r#"     Y   _  \ Y   Y   Y   Y   _   Y   _  \Y   _   Y   Y   _   Y   _  \"#,
+        ),
+        (
+            7,
+            r#"     |   |   \|   |       |   l___|   |   |   l___l   |   |   |   |   |"#,
+        ),
+        (
+            15,
+            r#"     |   |    \   |  \_/  |   __)_    |   l____   |   |   |   |   |   |"#,
+        ),
+        (
+            15,
+            r#"     |   l    /   |   |   |   l   |   |   |   l   |   |   l   |   |   |"#,
+        ),
+        (
+            15,
+            r#"     l_______/|   l___|   l_______l___|   l_______|   l_______l___|   l"#,
+        ),
+        (
+            15,
+            r#"              `---'   `---'           `---'       `---'           `---'"#,
+        ),
+        (
+            15,
+            r#"     _______ _______ _______ ___________ ___ ___ _______ _______ _______"#,
+        ),
+        (
+            7,
+            r#"    Y   _   Y   _   Y   _   Y   _   _   Y   Y   Y   _   Y   _   \   _   Y"#,
+        ),
+        (
+            7,
+            r#"    |   l___l   |   |   l___l___|   |___l   |   |   l   |   l   /   l___|"#,
+        ),
+        (
+            7,
+            r#"    l____   |   |   |   __)     |   |   |  / \  |   _   |   _   l   __)_"#,
+        ),
+        (
+            8,
+            r#"    |   l   |   l   |   |       |   |   |       |   |   |   |   |   l   |"#,
+        ),
+        (
+            8,
+            r#"    |_______|_______l   |       |   l   l___l___l___|   l___|   l_______|"#,
+        ),
+        (
+            8,
+            r#"                    `---'       `---'               `---'   `---'"#,
+        ),
+        (15, r#"                         http://4ds.simplenet.com/"#),
+    ];
+
+    let mut y = 0;
+    for (dos_color, line) in lines.iter() {
+        let color = match dos_color {
+            7 => Color::Grey,
+            8 => Color::DarkGrey,
+            15 => Color::White,
+            _ => Color::Red,
+        };
+
+        y = y + 1;
+        stdout
+            .queue(SetForegroundColor(color))?
+            .queue(Print(line))?
+            .queue(MoveTo(0, y))?;
+    }
+
+    // Add an extra line between the logo and the prompt
+    stdout.queue(MoveTo(0, y + 1))?.flush()?;
+
     Ok(())
 }

@@ -32,6 +32,7 @@ fn color_to_ansi_color(color: Option<u32>, is_bg: bool) -> Result<u32> {
     Ok(color_code)
 }
 
+// Convert a DOS background color
 fn color_to_blink(color: Option<u32>) -> Result<u32> {
     let blink_code = match color {
         Some(color) if color % 2 == 0 => 25,

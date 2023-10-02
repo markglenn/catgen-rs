@@ -9,7 +9,7 @@ use ui::draw_footer;
 
 use crossterm::{
     cursor::MoveTo,
-    event::{Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind},
     style::Print,
     terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand, QueueableCommand,
@@ -18,7 +18,9 @@ use crossterm::{
 type PrintableLines = Vec<PrintableLine>;
 
 fn main() -> Result<()> {
-    stdout().execute(EnterAlternateScreen)?;
+    stdout()
+        .execute(EnterAlternateScreen)?
+        .execute(EnableMouseCapture)?;
 
     // Get the size of the terminal
     let (width, height) = crossterm::terminal::size()?;
@@ -70,8 +72,12 @@ fn main() -> Result<()> {
     }
 
     crossterm::terminal::disable_raw_mode()?;
-    stdout.execute(crossterm::cursor::Show)?;
-    stdout.execute(LeaveAlternateScreen)?;
+    stdout
+        .execute(crossterm::cursor::Show)?
+        .execute(LeaveAlternateScreen)?
+        .execute(DisableMouseCapture)?;
+
+    ui::draw_closing_screen(&stdout)?;
 
     Ok(())
 }
