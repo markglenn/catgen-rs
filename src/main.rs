@@ -1,13 +1,14 @@
 mod ansi;
 mod parser;
+mod search;
 mod state;
 mod ui;
 
 use anyhow::Result;
 use parser::PrintableLine;
 use state::State;
-use std::io::{stdout, Stdout, Write};
-use ui::{draw_footer, draw_scollbar};
+use std::io::{stdin, stdout, BufRead, Stdout, Write};
+use ui::{draw_footer, draw_scollbar, draw_search};
 
 use crossterm::{
     cursor::{self, MoveTo},
@@ -41,6 +42,10 @@ fn main() -> Result<()> {
             draw_doc(&stdout, &lines, &state)?;
             draw_scollbar(&stdout, &state)?;
             draw_footer(&stdout, &state)?;
+
+            if state.application_state != state::ApplicationState::Normal {
+                ui::draw_search(&stdout, &state)?;
+            }
         }
 
         handle_events(&mut state, &lines)?;
@@ -109,6 +114,24 @@ fn handle_events(state: &mut State, lines: &Vec<PrintableLine>) -> Result<()> {
         }) => state.scroll_down(state.document_length),
 
         Event::Key(KeyEvent {
+            code: KeyCode::Char('s'),
+            kind: KeyEventKind::Press,
+            ..
+        }) => {
+            terminal::disable_raw_mode()?;
+            let search = get_search_string(state)?.trim().to_string();
+
+            // If the search string is empty, go back to normal mode
+            if search.is_empty() {
+                state.application_state = state::ApplicationState::Normal;
+            } else {
+                state.application_state = search::get_search_state(&lines, &search);
+            }
+
+            is_dirty = true;
+        }
+
+        Event::Key(KeyEvent {
             code: KeyCode::PageUp,
             kind: KeyEventKind::Press,
             ..
@@ -150,6 +173,17 @@ fn handle_events(state: &mut State, lines: &Vec<PrintableLine>) -> Result<()> {
     state.is_dirty = is_dirty || state.current_line != previous_line;
 
     Ok(())
+}
+
+fn get_search_string(state: &mut State) -> Result<String, anyhow::Error> {
+    let mut line = String::new();
+
+    terminal::disable_raw_mode()?;
+    draw_search(&stdout(), state)?;
+    stdin().lock().read_line(&mut line).unwrap();
+    terminal::enable_raw_mode()?;
+
+    Ok(line)
 }
 
 fn draw_doc(

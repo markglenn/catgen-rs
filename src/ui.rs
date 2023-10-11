@@ -9,6 +9,17 @@ use std::io::{Stdout, Write};
 
 use crate::{parser::generate_line, state::State};
 
+pub fn draw_search(mut stdout: &Stdout, state: &State) -> Result<()> {
+    stdout
+        .queue(MoveTo(0, state.height - 1))?
+        .queue(Clear(ClearType::UntilNewLine))?
+        .queue(SetColors(Colors::new(Color::White, Color::Black)))?
+        .queue(Print("Search for What:"))?;
+
+    stdout.flush()?;
+    Ok(())
+}
+
 pub fn draw_footer(mut stdout: &Stdout, state: &State) -> Result<()> {
     stdout
         .queue(MoveTo(0, state.height - 2))?

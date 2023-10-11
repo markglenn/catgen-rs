@@ -1,3 +1,9 @@
+#[derive(Debug, PartialEq)]
+pub enum ApplicationState {
+    Normal,
+    Search(Option<usize>, String),
+}
+
 pub struct State {
     pub current_line: usize,
     pub running: bool,
@@ -5,6 +11,7 @@ pub struct State {
     pub height: u16,
     pub document_length: usize,
     pub is_dirty: bool,
+    pub application_state: ApplicationState,
 }
 
 impl State {
@@ -16,6 +23,7 @@ impl State {
             height: size.1,
             document_length,
             is_dirty: true,
+            application_state: ApplicationState::Normal,
         }
     }
 
